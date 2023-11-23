@@ -1,8 +1,14 @@
 package main
 
 import (
+	"bytes"
+	"context"
 	"fmt"
+	"log/slog"
+	"net/http"
+	"os/exec"
 
+	"github.com/gin-gonic/gin"
 	"github.com/spf13/viper"
 )
 
@@ -13,7 +19,7 @@ type Config struct {
 }
 
 type CmdConfig struct {
-	Cmds []string `toml:"cmds"`
+	Cmd []string `toml:"cmds"`
 }
 
 func main() {
@@ -27,7 +33,41 @@ func main() {
 		panic(fmt.Errorf("fatal error config file: %w", err))
 	}
 	var config Config
-	viper.Unmarshal(&config)
-	fmt.Printf("%+v\n", config)
-	fmt.Println("hello world")
+	if err := viper.Unmarshal(&config); err != nil {
+		panic(fmt.Errorf("fatal error unmarshal config: %w", err))
+	}
+	route := gin.Default()
+	route.GET("/:name", func(c *gin.Context) {
+		name := c.Param("name")
+		cl, ok := config.Commands[name]
+		if !ok {
+			c.JSON(http.StatusNotFound, gin.H{
+				"message": "not found",
+			})
+			return
+		}
+		stdout, stderr, err := executeCmd(c, cl.Cmd)
+		slog.Info("executeCmd", "cl", cl, "stdout", stdout, "stderr", stderr, "err", err)
+		var errStr string
+		if err != nil {
+			errStr = err.Error()
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"stdout": stdout,
+			"stderr": stderr,
+			"error":  errStr,
+		})
+	})
+	route.Run(fmt.Sprintf("%s:%d", config.Host, config.Port))
+}
+
+func executeCmd(ctx context.Context, cl []string) (stdout string, stderr string, err error) {
+	cmd := exec.CommandContext(ctx, cl[0], cl[1:]...)
+	var o, e bytes.Buffer
+	cmd.Stdout = &o
+	cmd.Stderr = &e
+	err = cmd.Run()
+	stdout = o.String()
+	stderr = e.String()
+	return
 }
