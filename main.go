@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os/exec"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/viper"
 )
@@ -37,6 +38,7 @@ func main() {
 		panic(fmt.Errorf("fatal error unmarshal config: %w", err))
 	}
 	route := gin.Default()
+	route.Use(cors.Default())
 	route.GET("/:name", func(c *gin.Context) {
 		name := c.Param("name")
 		cl, ok := config.Commands[name]
