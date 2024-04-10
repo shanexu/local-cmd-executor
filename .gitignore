@@ -27,3 +27,4 @@ vendor/
 /test-output/
 
 /local-cmd-executor
+/nohup.out
